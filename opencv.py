@@ -1,17 +1,5 @@
-# image = cv2.imread('photo_2021-10-22_17-22-15.jpg')
-#     print(image.shape)
-#     image = thresh(image)
-#     cv2.imwrite('img1.png', image)
-#     viewImage(image)
-#     image = thickening_line(image, rad=8)
-#     image = resize(image)
-#     cv2.imwrite('img.png', image)
-#     viewImage(image)
 import cv2
 import numpy as np
-import random as rnd
-import os
-from prdictofobrabotannimg import predict
 
 
 def viewImage(image, name_of_window='cv2'):
@@ -20,51 +8,26 @@ def viewImage(image, name_of_window='cv2'):
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-
-def thresh(image, val1=100, val2=255, val3=0):
-    gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    ret, threshold_image = cv2.threshold(gray_image, val1, val2, val3)
-    return threshold_image
-
-
-def find_contours(img):
-    # blurred = cv2.GaussianBlur(image, (3, 3), 0)
-    # T, thresh_img = cv2.threshold(blurred, 215, 255,
-    #                               cv2.THRESH_BINARY)
-    cnts, h = cv2.findContours(img,
-                               cv2.RETR_EXTERNAL,
-                               cv2.CHAIN_APPROX_SIMPLE)
-    return cnts
-
-
 def thresh_callback(img):
-    threshold1 = 100
+    threshold1 = 1
     threshold2 = 200
     img = cv2.Canny(img, threshold1, threshold2)
-    # Find contours
     contours, hierarchy = cv2.findContours(img,
                                            cv2.RETR_TREE,
                                            cv2.CHAIN_APPROX_SIMPLE)
-    # Draw contours
     drawing = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
     for i in range(len(contours)):
-        color = (rnd.randint(0, 256), rnd.randint(0, 256), rnd.randint(0, 256))
+        color = (255, 255, 255)
         cv2.drawContours(drawing, contours, i, color, 2, cv2.LINE_8, hierarchy, 0)
-    # Show in a window
-    viewImage(drawing)
+
     return drawing
 
 
-def thickening_line(img, rad=3):
+def thickening_line(img, rad=2):
     drawing = np.full(shape=img.shape, dtype=np.uint8, fill_value=255)
-    k_row = 0
-    for row in img:
-        k_column = 0
-        for column in row:
-            if column == 0:
-                cv2.circle(drawing, (k_row, k_column), rad, (0, 0, 0), rad)
-            k_column += 1
-        k_row += 1
+    points = np.argwhere(img == 255)
+    for i in points:
+        cv2.circle(drawing, i[:2][::-1], rad, (0, 0, 0))
     return drawing
 
 
@@ -74,16 +37,38 @@ def changing_size(img):
     return output
 
 
-def contours(img):
-    edges = cv2.Canny(img, 150, 175)
-    return edges
+def square(img):
+    rsz_img = cv2.resize(img, None, fx=0.25, fy=0.25)  # resize since image is huge
+    gray = cv2.cvtColor(rsz_img, cv2.COLOR_BGR2GRAY)  # convert to grayscale
+    retval, thresh_gray = cv2.threshold(gray, thresh=100, maxval=255, type=cv2.THRESH_BINARY)
+    points = np.argwhere(thresh_gray == 0)  # find where the black pixels are
+    points = np.fliplr(points)  # store them in x,y coordinates instead of row,col indices
+    x, y, w, h = cv2.boundingRect(points)  # create a rectangle around those points
+    if w < h:
+        w = h
+    elif w > h:
+        h = w
+    x, y, w, h = x - 10, y - 10, w + 20, h + 20  # make the box a little bigger
+    crop = gray[y:y + h, x:x + w]  # create a cropped region of the gray image
+    retval, thresh_crop = cv2.threshold(crop, thresh=200, maxval=255, type=cv2.THRESH_BINARY)
+    return thresh_crop
 
 
-def resize(img):
-    return img[110:960, 100:950]#низ 950 вверх100 право960 лево 200
+def main(file_path):
+    image = cv2.imread(file_path)
+    # viewImage(image)
+    image = thresh_callback(image)
 
+    # viewImage(image)
+    image = thickening_line(image, rad=16)
+
+    # viewImage(image)
+    image = square(image)
+
+    # viewImage(image)
+    image = changing_size(image)
+    cv2.imwrite('archive/test/test/new.png', image)
+    # viewImage(image)
 
 if __name__ == '__main__':
-    image = cv2.imread('img.png')
-    image = cv2.resize(image, [28,28])
-    cv2.imwrite('img1.png', image)
+    main('/home/fedor/Desktop/network/test_image/IMG_20220316_215751_658.jpg')
